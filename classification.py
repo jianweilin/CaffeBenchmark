@@ -12,15 +12,13 @@ import cv2
 caffe_root = "/home/trunia1/dev/lib/caffe/"
 
 
-def load_network(model_def, model_weights, batch_size):
+def load_network(model_def, model_weights, batch_size, input_dim):
 
     caffe.set_mode_gpu()
 
     # Use TEST mode, e.g. don't perform dropout
     net = caffe.Net(model_def, model_weights, caffe.TEST)
-
-    im_dimension = (224, 244)
-    net.blobs['data'].reshape(batch_size, 3, im_dimension[0], im_dimension[1])
+    net.blobs['data'].reshape(batch_size, input_dim[0], input_dim[1], input_dim[2])
 
     return net
 
@@ -61,6 +59,9 @@ def predict_images(net, image_dir):
     # Load image files in directory
     im_files = glob.glob(os.path.join(image_dir, "*.jpg"))
 
+    time_total = 0
+    num_processed = 0
+
     for im_file in im_files:
 
         t_start = datetime.datetime.now()
@@ -77,17 +78,24 @@ def predict_images(net, image_dir):
         # Output probability vector
         output_prob = output['prob'][0]
 
-        duration = datetime.datetime.now() - t_start
+        t_end = datetime.datetime.now()
+        duration = t_end - t_start
+        duration = duration.microseconds * 1e-3
+
+        if duration > 0:
+            num_processed += 1
+            time_total += duration
+            time_avg    = time_total / float(num_processed)
 
         top_predictions = output_prob.argsort()[::-1][:5]
         print("#" * 40)
-        print("Classification done in %.1fms" % (duration.microseconds*1e-3))
+        print("Classification done in %.1fms [avg = %.1fms]" % (duration, time_avg))
         print("Probabilities and labels: ")
         for i in top_predictions:
             print("  %s (%.2f)" % (labels[i], output_prob[i]))
 
-        cv2.imshow("Image", image)
-        cv2.waitKey(1)
+        #cv2.imshow("Image", image)
+        #cv2.waitKey(1)
 
     cv2.destroyAllWindows()
 
@@ -95,18 +103,36 @@ def predict_images(net, image_dir):
 
 if __name__ == '__main__':
 
-    model_def =     "/home/trunia1/dev/lib/caffe/models/bvlc_googlenet/deploy.prototxt"
-    model_weights = "/home/trunia1/data/CaffeModels/bvlc_googlenet.caffemodel"
+    # AlexNet
+    #model_def =     "/home/trunia1/dev/lib/caffe/models/bvlc_alexnet/deploy.prototxt"
+    #model_weights = "/home/trunia1/data/CaffeModels/bvlc_alexnet.caffemodel"
+
+    # GoogLeNet
+    #model_def =     "/home/trunia1/dev/lib/caffe/models/bvlc_googlenet/deploy.prototxt"
+    #model_weights = "/home/trunia1/data/CaffeModels/bvlc_googlenet.caffemodel"
+
+    # VGG ILSVR (16 layers)
+    #model_def =     "/home/trunia1/data/CaffeModels/VGG_ILSVRC_16_layers_deploy.prototxt"
+    #model_weights = "/home/trunia1/data/CaffeModels/VGG_ILSVRC_16_layers.caffemodel"
+
+    # VGG ILSVR (19 layers)
+    #model_def =     "/home/trunia1/data/CaffeModels/VGG_ILSVRC_19_layers_deploy.prototxt"
+    #model_weights = "/home/trunia1/data/CaffeModels/VGG_ILSVRC_19_layers.caffemodel"
+
+    # Microsoft ResNets
+    model_def =     "/home/trunia1/data/CaffeModels/deep-residual-networks/ResNet-50-deploy.prototxt"
+    model_weights = "/home/trunia1/data/CaffeModels/deep-residual-networks/ResNet-50-model.caffemodel"
+
     image_dir =     "/home/trunia1/data/MS-COCO/val2014/"
 
     batch_size = 1
+    #input_dim  = (3, 227, 227)     # AlexNet
+    input_dim  = (3, 224, 224)     # GoogLeNet, VGG
 
     # Load Caffe network from definition+weights
-    network = load_network(model_def, model_weights, batch_size)
+    network = load_network(model_def, model_weights, batch_size, input_dim)
 
     # Predict all images in the directory one-by-one
     predict_images(network, image_dir)
-
-
 
 
